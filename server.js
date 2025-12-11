@@ -219,12 +219,17 @@ app.get('/p/:code', async (req, res) => {
     }
     
     // 3. Check if mobile browser (for payment apps)
+    // CRITICAL: Payment apps open URLs in mobile browsers, so we MUST check this
     const isMobileBrowser = /Mobile|Android|iPhone|iPad|webview|wv/i.test(userAgent);
     
     console.log(`[MOBILE CHECK] isMobileBrowser: ${isMobileBrowser}, userAgent: ${userAgent.substring(0, 150)}`);
+    console.log(`[MOBILE CHECK] AppType: ${appType}, Is Payment App: ${appType === AppType.GOOGLE_PAY || appType === AppType.PHONEPE || appType === AppType.PAYTM}`);
     
-    // IF MOBILE BROWSER - Check if it's a payment app, otherwise show landing page
-    if (isMobileBrowser && codeMerchants.length > 0) {
+    // CRITICAL: If it's a payment app OR mobile browser, ALWAYS try to show redirect page
+    // NEVER show landing page for payment apps or mobile browsers
+    const isPaymentApp = appType === AppType.GOOGLE_PAY || appType === AppType.PHONEPE || appType === AppType.PAYTM;
+    
+    if ((isMobileBrowser || isPaymentApp) && codeMerchants.length > 0) {
       const merchant = codeMerchants[0];
       let upiIntent = null;
       
@@ -285,15 +290,19 @@ app.get('/p/:code', async (req, res) => {
           console.log(`[UPI SELECT] Using Paytm intent (detected from User-Agent)`);
         }
       }
-      // 4. Last resort: Only if we truly can't detect anything, default to PhonePe
-      else if (!upiIntent) {
-        console.log(`[UPI SELECT] Detection failed, defaulting to PhonePe`);
+      // 4. Last resort: If still no UPI intent found, try ALL payment apps in order
+      if (!upiIntent) {
+        console.log(`[UPI SELECT] Detection failed, trying all payment apps as fallback`);
+        // Try PhonePe first (most common in India)
         if (merchant.upi?.phonepe_intent) {
           upiIntent = merchant.upi.phonepe_intent;
+          console.log(`[UPI SELECT] Fallback: Using PhonePe intent`);
         } else if (merchant.upi?.gpay_intent) {
           upiIntent = merchant.upi.gpay_intent;
+          console.log(`[UPI SELECT] Fallback: Using GPay intent`);
         } else if (merchant.upi?.paytm_intent) {
           upiIntent = merchant.upi.paytm_intent;
+          console.log(`[UPI SELECT] Fallback: Using Paytm intent`);
         }
       }
       
