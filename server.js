@@ -149,29 +149,37 @@ app.get('/p/:code', async (req, res) => {
       console.log(`[DETECTION] Method: X-Requested-With -> Paytm`);
     }
     
-    // Method 2: Check User-Agent patterns
-    if (appType === AppType.BROWSER) {
-      if (userAgent.includes('paisa') || userAgent.includes('gpay') || userAgent.includes('google pay') || userAgent.includes('tez')) {
+    // Method 2: Check User-Agent patterns (check Google Lens FIRST)
+    const uaLower = userAgent.toLowerCase();
+    if (uaLower.includes('lens') || uaLower.includes('googlelens') || uaLower.includes('google-lens')) {
+      appType = AppType.GOOGLE_LENS;
+      console.log(`[DETECTION] Method: User-Agent -> Google Lens`);
+    } else if (appType === AppType.BROWSER || appType === AppType.UNKNOWN) {
+      if (uaLower.includes('paisa') || uaLower.includes('gpay') || uaLower.includes('google pay') || uaLower.includes('tez')) {
         appType = AppType.GOOGLE_PAY;
         console.log(`[DETECTION] Method: User-Agent -> Google Pay`);
-      } else if (userAgent.includes('phonepe') || userAgent.includes('phone-pe')) {
+      } else if (uaLower.includes('phonepe') || uaLower.includes('phone-pe')) {
         appType = AppType.PHONEPE;
         console.log(`[DETECTION] Method: User-Agent -> PhonePe`);
-      } else if (userAgent.includes('paytm')) {
+      } else if (uaLower.includes('paytm')) {
         appType = AppType.PAYTM;
         console.log(`[DETECTION] Method: User-Agent -> Paytm`);
       }
     }
     
-    // Method 3: Check Referer
-    if (appType === AppType.BROWSER && referer) {
-      if (referer.includes('phonepe') || referer.includes('phone-pe')) {
+    // Method 3: Check Referer (check BEFORE other detections override)
+    if (referer) {
+      const refLower = referer.toLowerCase();
+      if (refLower.includes('lens') || refLower.includes('googlelens')) {
+        appType = AppType.GOOGLE_LENS;
+        console.log(`[DETECTION] Method: Referer -> Google Lens`);
+      } else if (refLower.includes('phonepe') || refLower.includes('phone-pe')) {
         appType = AppType.PHONEPE;
         console.log(`[DETECTION] Method: Referer -> PhonePe`);
-      } else if (referer.includes('gpay') || referer.includes('google pay') || referer.includes('paisa')) {
+      } else if (refLower.includes('gpay') || refLower.includes('google pay') || refLower.includes('paisa')) {
         appType = AppType.GOOGLE_PAY;
         console.log(`[DETECTION] Method: Referer -> Google Pay`);
-      } else if (referer.includes('paytm')) {
+      } else if (refLower.includes('paytm')) {
         appType = AppType.PAYTM;
         console.log(`[DETECTION] Method: Referer -> Paytm`);
       }
@@ -225,84 +233,55 @@ app.get('/p/:code', async (req, res) => {
     console.log(`[MOBILE CHECK] isMobileBrowser: ${isMobileBrowser}, userAgent: ${userAgent.substring(0, 150)}`);
     console.log(`[MOBILE CHECK] AppType: ${appType}, Is Payment App: ${appType === AppType.GOOGLE_PAY || appType === AppType.PHONEPE || appType === AppType.PAYTM}`);
     
-    // CRITICAL: If it's a payment app OR mobile browser, ALWAYS try to show redirect page
-    // NEVER show landing page for payment apps or mobile browsers
+    // CRITICAL: Only handle payment apps here - NOT Google Lens, NOT Camera, NOT WiFi Scanner
+    // Payment apps: GPay, PhonePe, Paytm
     const isPaymentApp = appType === AppType.GOOGLE_PAY || appType === AppType.PHONEPE || appType === AppType.PAYTM;
     
-    if ((isMobileBrowser || isPaymentApp) && codeMerchants.length > 0) {
+    // ONLY process payment apps OR mobile browsers that might be payment apps
+    // DO NOT process Google Lens, Camera, or WiFi Scanner here
+    if (isPaymentApp && codeMerchants.length > 0) {
       const merchant = codeMerchants[0];
       let upiIntent = null;
       
-      // DEBUG: Log merchant data
-      console.log(`[DEBUG] Merchant: ${merchant.name}, Has UPI: ${!!merchant.upi}, GPay Intent: ${!!merchant.upi?.gpay_intent}`);
-      console.log(`[DEBUG] AppType: ${appType}, Expected: ${AppType.GOOGLE_PAY}`);
-      
-      // CRITICAL: Check detection in priority order
-      // 1. First check appType (from headers)
-      if (appType === AppType.GOOGLE_PAY) {
-        if (merchant.upi?.gpay_intent) {
-          upiIntent = merchant.upi.gpay_intent;
-          console.log(`[UPI SELECT] Using Google Pay intent (detected from appType)`);
-        } else {
-          console.log(`[ERROR] Google Pay detected but merchant.upi.gpay_intent is missing`);
-          console.log(`[DEBUG] Merchant UPI object:`, JSON.stringify(merchant.upi, null, 2));
-        }
-      } else if (appType === AppType.PHONEPE) {
-        if (merchant.upi?.phonepe_intent) {
-          upiIntent = merchant.upi.phonepe_intent;
-          console.log(`[UPI SELECT] Using PhonePe intent (detected from appType)`);
-        } else {
-          console.log(`[ERROR] PhonePe detected but merchant.upi.phonepe_intent is missing`);
-        }
-      } else if (appType === AppType.PAYTM) {
-        if (merchant.upi?.paytm_intent) {
-          upiIntent = merchant.upi.paytm_intent;
-          console.log(`[UPI SELECT] Using Paytm intent (detected from appType)`);
-        } else {
-          console.log(`[ERROR] Paytm detected but merchant.upi.paytm_intent is missing`);
-        }
+      // CRITICAL: Use the CORRECT payment app based on detection
+      // DO NOT default to PhonePe - use the detected app
+      if (appType === AppType.GOOGLE_PAY && merchant.upi?.gpay_intent) {
+        upiIntent = merchant.upi.gpay_intent;
+        console.log(`[UPI SELECT] Using Google Pay intent (detected)`);
+      } else if (appType === AppType.PHONEPE && merchant.upi?.phonepe_intent) {
+        upiIntent = merchant.upi.phonepe_intent;
+        console.log(`[UPI SELECT] Using PhonePe intent (detected)`);
+      } else if (appType === AppType.PAYTM && merchant.upi?.paytm_intent) {
+        upiIntent = merchant.upi.paytm_intent;
+        console.log(`[UPI SELECT] Using Paytm intent (detected)`);
       }
-      // 2. If detection failed, check Referer header (payment apps often set this)
-      else if (!upiIntent && referer) {
+      
+      // If detection failed but we know it's a payment app, check Referer/User-Agent
+      if (!upiIntent && referer) {
         const refLower = referer.toLowerCase();
         if ((refLower.includes('gpay') || refLower.includes('google pay') || refLower.includes('paisa')) && merchant.upi?.gpay_intent) {
           upiIntent = merchant.upi.gpay_intent;
-          console.log(`[UPI SELECT] Using Google Pay intent (detected from Referer: ${referer.substring(0, 50)})`);
+          console.log(`[UPI SELECT] Using Google Pay intent (from Referer)`);
         } else if ((refLower.includes('phonepe') || refLower.includes('phone-pe')) && merchant.upi?.phonepe_intent) {
           upiIntent = merchant.upi.phonepe_intent;
-          console.log(`[UPI SELECT] Using PhonePe intent (detected from Referer: ${referer.substring(0, 50)})`);
+          console.log(`[UPI SELECT] Using PhonePe intent (from Referer)`);
         } else if (refLower.includes('paytm') && merchant.upi?.paytm_intent) {
           upiIntent = merchant.upi.paytm_intent;
-          console.log(`[UPI SELECT] Using Paytm intent (detected from Referer: ${referer.substring(0, 50)})`);
+          console.log(`[UPI SELECT] Using Paytm intent (from Referer)`);
         }
       }
-      // 3. If still not detected, check User-Agent more aggressively
-      else if (!upiIntent && userAgent) {
+      
+      if (!upiIntent && userAgent) {
         const uaLower = userAgent.toLowerCase();
         if ((uaLower.includes('paisa') || uaLower.includes('gpay') || uaLower.includes('google pay') || uaLower.includes('tez')) && merchant.upi?.gpay_intent) {
           upiIntent = merchant.upi.gpay_intent;
-          console.log(`[UPI SELECT] Using Google Pay intent (detected from User-Agent)`);
+          console.log(`[UPI SELECT] Using Google Pay intent (from User-Agent)`);
         } else if ((uaLower.includes('phonepe') || uaLower.includes('phone-pe')) && merchant.upi?.phonepe_intent) {
           upiIntent = merchant.upi.phonepe_intent;
-          console.log(`[UPI SELECT] Using PhonePe intent (detected from User-Agent)`);
+          console.log(`[UPI SELECT] Using PhonePe intent (from User-Agent)`);
         } else if (uaLower.includes('paytm') && merchant.upi?.paytm_intent) {
           upiIntent = merchant.upi.paytm_intent;
-          console.log(`[UPI SELECT] Using Paytm intent (detected from User-Agent)`);
-        }
-      }
-      // 4. Last resort: If still no UPI intent found, try ALL payment apps in order
-      if (!upiIntent) {
-        console.log(`[UPI SELECT] Detection failed, trying all payment apps as fallback`);
-        // Try PhonePe first (most common in India)
-        if (merchant.upi?.phonepe_intent) {
-          upiIntent = merchant.upi.phonepe_intent;
-          console.log(`[UPI SELECT] Fallback: Using PhonePe intent`);
-        } else if (merchant.upi?.gpay_intent) {
-          upiIntent = merchant.upi.gpay_intent;
-          console.log(`[UPI SELECT] Fallback: Using GPay intent`);
-        } else if (merchant.upi?.paytm_intent) {
-          upiIntent = merchant.upi.paytm_intent;
-          console.log(`[UPI SELECT] Fallback: Using Paytm intent`);
+          console.log(`[UPI SELECT] Using Paytm intent (from User-Agent)`);
         }
       }
       
