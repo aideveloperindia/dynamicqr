@@ -227,108 +227,121 @@ app.get('/p/:code', async (req, res) => {
         console.log(`[UPI INTENT] ${appType} -> ${upiIntent}`);
         // Return minimal HTML with clickable link that definitely works
         // PhonePe/Google Pay browsers often block JavaScript redirects, so use direct link
+        // CRITICAL: PhonePe shows warning, then opens URL in browser
+        // We need to redirect IMMEDIATELY when page loads
+        // Use meta refresh + JavaScript + direct link - all methods at once
         const html = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Opening Payment App...</title>
+<title>Opening Payment...</title>
+<!-- Meta refresh as backup -->
+<meta http-equiv="refresh" content="0;url=${upiIntent}">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html, body { 
-  margin:0; 
-  padding:0; 
-  width:100%;
-  height:100%;
+  margin:0; padding:0; 
+  width:100%; height:100%;
   overflow:hidden;
+  background:#000;
 }
 body { 
   font-family:Arial, sans-serif; 
-  text-align:center; 
-  background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display:flex;
   align-items:center;
   justify-content:center;
   position:fixed;
-  top:0;
-  left:0;
-  right:0;
-  bottom:0;
+  top:0; left:0; right:0; bottom:0;
 }
 .container {
   background:white;
-  padding:30px 20px;
-  border-radius:15px;
-  box-shadow:0 10px 40px rgba(0,0,0,0.3);
-  max-width:350px;
+  padding:25px 20px;
+  border-radius:12px;
+  max-width:320px;
   width:90%;
+  text-align:center;
 }
-h1 { color:#333; margin-bottom:15px; font-size:22px; }
-p { color:#666; margin-bottom:25px; font-size:15px; }
+h1 { color:#333; margin-bottom:12px; font-size:20px; }
+p { color:#666; margin-bottom:20px; font-size:14px; }
 .btn { 
   display:block; 
   width:100%;
-  padding:20px; 
+  padding:18px; 
   background:#007bff; 
   color:white; 
   text-decoration:none; 
   border-radius:8px; 
-  font-size:20px; 
+  font-size:18px; 
   font-weight:bold;
-  box-shadow:0 4px 15px rgba(0,123,255,0.4);
-  border:none;
-  cursor:pointer;
-}
-.btn:active {
-  background:#0056b3;
-  transform:scale(0.98);
+  box-shadow:0 4px 12px rgba(0,123,255,0.4);
 }
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>Opening Payment App...</h1>
-  <p>Tap the button below to open payment app:</p>
-  <a href="${upiIntent}" class="btn" id="openBtn">Open Payment App</a>
+  <h1>Opening Payment...</h1>
+  <p>Please wait...</p>
+  <a href="${upiIntent}" id="openBtn" class="btn" style="display:none;">Open Payment</a>
 </div>
 <script>
 (function() {
   const upiIntent = "${upiIntent}";
-  const btn = document.getElementById('openBtn');
+  console.log('[REDIRECT] Target:', upiIntent);
   
-  // Try immediate redirect
-  try {
-    window.location.href = upiIntent;
-  } catch(e) {}
-  
-  // Auto-click button immediately
-  if (btn) {
-    // Try multiple times
-    setTimeout(function() { btn.click(); }, 50);
-    setTimeout(function() { btn.click(); }, 150);
-    setTimeout(function() { btn.click(); }, 300);
-    setTimeout(function() { btn.click(); }, 500);
-  }
-  
-  // Also try direct redirects
-  setTimeout(function() {
+  // IMMEDIATE redirect - try ALL methods
+  function redirect() {
     try {
       window.location.replace(upiIntent);
-      window.location = upiIntent;
       window.location.href = upiIntent;
-    } catch(e) {}
-  }, 100);
+      window.location = upiIntent;
+      document.location = upiIntent;
+      document.location.href = upiIntent;
+    } catch(e) {
+      console.log('[REDIRECT] Error:', e);
+    }
+  }
   
-  // When user returns from warning, click button
+  // Redirect immediately
+  redirect();
+  
+  // Also try on every possible event
+  setTimeout(redirect, 0);
+  setTimeout(redirect, 10);
+  setTimeout(redirect, 50);
+  setTimeout(redirect, 100);
+  setTimeout(redirect, 200);
+  setTimeout(redirect, 500);
+  
+  // Show button as fallback
+  const btn = document.getElementById('openBtn');
+  if (btn) {
+    setTimeout(function() {
+      btn.style.display = 'block';
+      // Auto-click button
+      setTimeout(function() { btn.click(); }, 100);
+      setTimeout(function() { btn.click(); }, 300);
+      setTimeout(function() { btn.click(); }, 600);
+    }, 300);
+  }
+  
+  // When page becomes visible (user returned from warning)
   document.addEventListener('visibilitychange', function() {
-    if (!document.hidden && btn) {
-      setTimeout(function() { btn.click(); }, 50);
-      setTimeout(function() { btn.click(); }, 200);
+    if (!document.hidden) {
+      redirect();
+      if (btn) {
+        setTimeout(function() { btn.click(); }, 50);
+      }
     }
   });
   
-  // Also on focus
-  window.addEventListener('focus', function() {
+  // On focus
+  window.addEventListener('focus', redirect);
+  window.addEventListener('pageshow', redirect);
+  
+  // Also try on load
+  window.addEventListener('load', function() {
+    redirect();
     if (btn) {
       setTimeout(function() { btn.click(); }, 100);
     }
