@@ -96,11 +96,19 @@ app.post('/admin/merchants', (req, res) => {
 
 // Main QR endpoint
 app.get('/p/:code', async (req, res) => {
+  // DISABLE CACHING - Always execute code
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  
   const { code } = req.params;
   const userAgent = req.get('user-agent') || '';
   const xRequestedWith = req.get('x-requested-with') || '';
   const referer = req.get('referer') || '';
   const ip = req.ip || req.connection.remoteAddress;
+  
+  // ALWAYS LOG - Even before detection
+  console.log(`[REQUEST] /p/${code} - UA: ${userAgent.substring(0, 80)}`);
   
   // Check for app type in query params (fallback for apps that don't send headers)
   const appParam = req.query.app; // ?app=gpay, ?app=phonepe, etc.
@@ -146,12 +154,14 @@ app.get('/p/:code', async (req, res) => {
       }
     }
     
-    // Enhanced logging for debugging
+    // ALWAYS LOG DETECTION - Critical for debugging
     console.log(`[DETECTION] Code: ${code}, App: ${appType}`);
     console.log(`[HEADERS] User-Agent: ${userAgent.substring(0, 150)}`);
     console.log(`[HEADERS] X-Requested-With: ${xRequestedWith || 'none'}`);
     console.log(`[HEADERS] Referer: ${referer || 'none'}`);
     console.log(`[QUERY] app param: ${appParam || 'none'}`);
+    console.log(`[DETECTION] Full UA: ${userAgent}`);
+    console.log(`[DETECTION] Full XRW: ${xRequestedWith}`);
 
     // IF PAYMENT APP DETECTED - RETURN UPI INTENT DIRECTLY (no redirect, no HTML)
     if (appType === AppType.GOOGLE_PAY || appType === AppType.PHONEPE || appType === AppType.PAYTM) {
