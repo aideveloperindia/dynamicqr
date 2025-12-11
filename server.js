@@ -194,8 +194,13 @@ app.get('/p/:code', async (req, res) => {
     // FINAL DETECTION LOG
     console.log(`[DETECTION RESULT] Code: ${code}, App: ${appType}`);
 
-    // IF PAYMENT APP DETECTED - RETURN UPI INTENT DIRECTLY
-    if (appType === AppType.GOOGLE_PAY || appType === AppType.PHONEPE || appType === AppType.PAYTM) {
+    // ALWAYS SHOW REDIRECT PAGE FOR MOBILE BROWSERS (payment apps open in browser)
+    // If it's a mobile browser, assume it might be from a payment app
+    const isMobileBrowser = /Mobile|Android|iPhone|iPad/.test(userAgent);
+    
+    // IF PAYMENT APP DETECTED OR MOBILE BROWSER - RETURN UPI INTENT DIRECTLY
+    if (appType === AppType.GOOGLE_PAY || appType === AppType.PHONEPE || appType === AppType.PAYTM || 
+        (isMobileBrowser && codeMerchants.length > 0)) {
       // Use first merchant for immediate response (fastest)
       const merchant = codeMerchants[0];
       
@@ -206,6 +211,16 @@ app.get('/p/:code', async (req, res) => {
         upiIntent = merchant.upi.phonepe_intent;
       } else if (appType === AppType.PAYTM && merchant.upi?.paytm_intent) {
         upiIntent = merchant.upi.paytm_intent;
+      } else if (isMobileBrowser) {
+        // Mobile browser but detection failed - try PhonePe first (most common in India)
+        // Then try others
+        if (merchant.upi?.phonepe_intent) {
+          upiIntent = merchant.upi.phonepe_intent;
+        } else if (merchant.upi?.gpay_intent) {
+          upiIntent = merchant.upi.gpay_intent;
+        } else if (merchant.upi?.paytm_intent) {
+          upiIntent = merchant.upi.paytm_intent;
+        }
       }
       
       if (upiIntent) {
@@ -220,105 +235,105 @@ app.get('/p/:code', async (req, res) => {
 <title>Opening Payment App...</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-body { 
+html, body { 
   margin:0; 
   padding:0; 
+  width:100%;
+  height:100%;
+  overflow:hidden;
+}
+body { 
   font-family:Arial, sans-serif; 
   text-align:center; 
   background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  min-height:100vh;
   display:flex;
   align-items:center;
   justify-content:center;
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
 }
 .container {
   background:white;
-  padding:40px 30px;
+  padding:30px 20px;
   border-radius:15px;
-  box-shadow:0 10px 40px rgba(0,0,0,0.2);
-  max-width:400px;
+  box-shadow:0 10px 40px rgba(0,0,0,0.3);
+  max-width:350px;
   width:90%;
 }
-h1 { color:#333; margin-bottom:20px; font-size:24px; }
-p { color:#666; margin-bottom:30px; font-size:16px; }
+h1 { color:#333; margin-bottom:15px; font-size:22px; }
+p { color:#666; margin-bottom:25px; font-size:15px; }
 .btn { 
-  display:inline-block; 
-  padding:18px 40px; 
+  display:block; 
+  width:100%;
+  padding:20px; 
   background:#007bff; 
   color:white; 
   text-decoration:none; 
   border-radius:8px; 
-  font-size:18px; 
+  font-size:20px; 
   font-weight:bold;
-  transition:all 0.3s;
-  box-shadow:0 4px 15px rgba(0,123,255,0.3);
-}
-.btn:hover { 
-  background:#0056b3; 
-  transform:translateY(-2px);
-  box-shadow:0 6px 20px rgba(0,123,255,0.4);
+  box-shadow:0 4px 15px rgba(0,123,255,0.4);
+  border:none;
+  cursor:pointer;
 }
 .btn:active {
-  transform:translateY(0);
+  background:#0056b3;
+  transform:scale(0.98);
 }
 </style>
-<script>
-(function() {
-  const upiIntent = "${upiIntent}";
-  console.log('[REDIRECT] Attempting redirect to:', upiIntent);
-  
-  // Try immediate redirect (might be blocked by browser)
-  try {
-    window.location.href = upiIntent;
-  } catch(e) {
-    console.log('[REDIRECT] Error:', e);
-  }
-  
-  // Also try after delays
-  setTimeout(function() {
-    try {
-      window.location.replace(upiIntent);
-    } catch(e) {}
-  }, 100);
-  
-  setTimeout(function() {
-    try {
-      window.location = upiIntent;
-    } catch(e) {}
-  }, 200);
-})();
-</script>
 </head>
 <body>
 <div class="container">
   <h1>Opening Payment App...</h1>
-  <p>If payment app doesn't open automatically, click below:</p>
+  <p>Tap the button below to open payment app:</p>
   <a href="${upiIntent}" class="btn" id="openBtn">Open Payment App</a>
 </div>
 <script>
-// Auto-click button after page loads (if redirect was blocked)
-window.addEventListener('load', function() {
-  setTimeout(function() {
-    const btn = document.getElementById('openBtn');
-    if (btn && document.hasFocus()) {
-      console.log('[REDIRECT] Auto-clicking button...');
-      btn.click();
-    }
-  }, 300);
-});
-
-// Also try on visibility change (when user returns from warning)
-document.addEventListener('visibilitychange', function() {
-  if (!document.hidden) {
-    setTimeout(function() {
-      const btn = document.getElementById('openBtn');
-      if (btn) {
-        console.log('[REDIRECT] Visibility changed, clicking button...');
-        btn.click();
-      }
-    }, 100);
+(function() {
+  const upiIntent = "${upiIntent}";
+  const btn = document.getElementById('openBtn');
+  
+  // Try immediate redirect
+  try {
+    window.location.href = upiIntent;
+  } catch(e) {}
+  
+  // Auto-click button immediately
+  if (btn) {
+    // Try multiple times
+    setTimeout(function() { btn.click(); }, 50);
+    setTimeout(function() { btn.click(); }, 150);
+    setTimeout(function() { btn.click(); }, 300);
+    setTimeout(function() { btn.click(); }, 500);
   }
-});
+  
+  // Also try direct redirects
+  setTimeout(function() {
+    try {
+      window.location.replace(upiIntent);
+      window.location = upiIntent;
+      window.location.href = upiIntent;
+    } catch(e) {}
+  }, 100);
+  
+  // When user returns from warning, click button
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && btn) {
+      setTimeout(function() { btn.click(); }, 50);
+      setTimeout(function() { btn.click(); }, 200);
+    }
+  });
+  
+  // Also on focus
+  window.addEventListener('focus', function() {
+    if (btn) {
+      setTimeout(function() { btn.click(); }, 100);
+    }
+  });
+})();
 </script>
 </body>
 </html>`;
