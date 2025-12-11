@@ -210,7 +210,8 @@ app.get('/p/:code', async (req, res) => {
       
       if (upiIntent) {
         console.log(`[UPI INTENT] ${appType} -> ${upiIntent}`);
-        // Return minimal HTML with immediate redirect + clickable link as fallback
+        // Return minimal HTML with clickable link that definitely works
+        // PhonePe/Google Pay browsers often block JavaScript redirects, so use direct link
         const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -218,41 +219,106 @@ app.get('/p/:code', async (req, res) => {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Opening Payment App...</title>
 <style>
-body { margin:0; padding:20px; font-family:Arial; text-align:center; background:#f5f5f5; }
-.btn { display:inline-block; padding:15px 30px; background:#007bff; color:white; text-decoration:none; border-radius:5px; font-size:18px; margin-top:20px; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { 
+  margin:0; 
+  padding:0; 
+  font-family:Arial, sans-serif; 
+  text-align:center; 
+  background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.container {
+  background:white;
+  padding:40px 30px;
+  border-radius:15px;
+  box-shadow:0 10px 40px rgba(0,0,0,0.2);
+  max-width:400px;
+  width:90%;
+}
+h1 { color:#333; margin-bottom:20px; font-size:24px; }
+p { color:#666; margin-bottom:30px; font-size:16px; }
+.btn { 
+  display:inline-block; 
+  padding:18px 40px; 
+  background:#007bff; 
+  color:white; 
+  text-decoration:none; 
+  border-radius:8px; 
+  font-size:18px; 
+  font-weight:bold;
+  transition:all 0.3s;
+  box-shadow:0 4px 15px rgba(0,123,255,0.3);
+}
+.btn:hover { 
+  background:#0056b3; 
+  transform:translateY(-2px);
+  box-shadow:0 6px 20px rgba(0,123,255,0.4);
+}
+.btn:active {
+  transform:translateY(0);
+}
 </style>
 <script>
 (function() {
   const upiIntent = "${upiIntent}";
-  // Try immediate redirect
+  console.log('[REDIRECT] Attempting redirect to:', upiIntent);
+  
+  // Try immediate redirect (might be blocked by browser)
   try {
-    window.location.replace(upiIntent);
     window.location.href = upiIntent;
-    document.location = upiIntent;
-  } catch(e) {}
+  } catch(e) {
+    console.log('[REDIRECT] Error:', e);
+  }
   
-  // Also try after a tiny delay
+  // Also try after delays
   setTimeout(function() {
-    window.location = upiIntent;
-    window.location.href = upiIntent;
-  }, 50);
-  
-  // And after 100ms
-  setTimeout(function() {
-    window.location.replace(upiIntent);
+    try {
+      window.location.replace(upiIntent);
+    } catch(e) {}
   }, 100);
+  
+  setTimeout(function() {
+    try {
+      window.location = upiIntent;
+    } catch(e) {}
+  }, 200);
 })();
 </script>
-<meta http-equiv="refresh" content="0;url=${upiIntent}">
 </head>
 <body>
-<p>Opening payment app...</p>
-<a href="${upiIntent}" class="btn" id="openBtn">Click to Open Payment App</a>
+<div class="container">
+  <h1>Opening Payment App...</h1>
+  <p>If payment app doesn't open automatically, click below:</p>
+  <a href="${upiIntent}" class="btn" id="openBtn">Open Payment App</a>
+</div>
 <script>
-// Make button click immediately if redirect fails
-setTimeout(function() {
-  document.getElementById('openBtn').click();
-}, 200);
+// Auto-click button after page loads (if redirect was blocked)
+window.addEventListener('load', function() {
+  setTimeout(function() {
+    const btn = document.getElementById('openBtn');
+    if (btn && document.hasFocus()) {
+      console.log('[REDIRECT] Auto-clicking button...');
+      btn.click();
+    }
+  }, 300);
+});
+
+// Also try on visibility change (when user returns from warning)
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden) {
+    setTimeout(function() {
+      const btn = document.getElementById('openBtn');
+      if (btn) {
+        console.log('[REDIRECT] Visibility changed, clicking button...');
+        btn.click();
+      }
+    }, 100);
+  }
+});
 </script>
 </body>
 </html>`;
