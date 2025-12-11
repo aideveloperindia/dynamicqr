@@ -228,17 +228,34 @@ app.get('/p/:code', async (req, res) => {
       const merchant = codeMerchants[0];
       let upiIntent = null;
       
+      // DEBUG: Log merchant data
+      console.log(`[DEBUG] Merchant: ${merchant.name}, Has UPI: ${!!merchant.upi}, GPay Intent: ${!!merchant.upi?.gpay_intent}`);
+      console.log(`[DEBUG] AppType: ${appType}, Expected: ${AppType.GOOGLE_PAY}`);
+      
       // CRITICAL: Check detection in priority order
       // 1. First check appType (from headers)
-      if (appType === AppType.GOOGLE_PAY && merchant.upi?.gpay_intent) {
-        upiIntent = merchant.upi.gpay_intent;
-        console.log(`[UPI SELECT] Using Google Pay intent (detected from appType)`);
-      } else if (appType === AppType.PHONEPE && merchant.upi?.phonepe_intent) {
-        upiIntent = merchant.upi.phonepe_intent;
-        console.log(`[UPI SELECT] Using PhonePe intent (detected from appType)`);
-      } else if (appType === AppType.PAYTM && merchant.upi?.paytm_intent) {
-        upiIntent = merchant.upi.paytm_intent;
-        console.log(`[UPI SELECT] Using Paytm intent (detected from appType)`);
+      if (appType === AppType.GOOGLE_PAY) {
+        if (merchant.upi?.gpay_intent) {
+          upiIntent = merchant.upi.gpay_intent;
+          console.log(`[UPI SELECT] Using Google Pay intent (detected from appType)`);
+        } else {
+          console.log(`[ERROR] Google Pay detected but merchant.upi.gpay_intent is missing`);
+          console.log(`[DEBUG] Merchant UPI object:`, JSON.stringify(merchant.upi, null, 2));
+        }
+      } else if (appType === AppType.PHONEPE) {
+        if (merchant.upi?.phonepe_intent) {
+          upiIntent = merchant.upi.phonepe_intent;
+          console.log(`[UPI SELECT] Using PhonePe intent (detected from appType)`);
+        } else {
+          console.log(`[ERROR] PhonePe detected but merchant.upi.phonepe_intent is missing`);
+        }
+      } else if (appType === AppType.PAYTM) {
+        if (merchant.upi?.paytm_intent) {
+          upiIntent = merchant.upi.paytm_intent;
+          console.log(`[UPI SELECT] Using Paytm intent (detected from appType)`);
+        } else {
+          console.log(`[ERROR] Paytm detected but merchant.upi.paytm_intent is missing`);
+        }
       }
       // 2. If detection failed, check Referer header (payment apps often set this)
       else if (!upiIntent && referer) {
@@ -415,12 +432,34 @@ p { color:#666; margin-bottom:20px; font-size:14px; }
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         return res.send(html);
       } else {
-        // Mobile browser but no UPI intent available - show error
-        console.log(`[ERROR] Mobile browser detected but no UPI intent available for merchant`);
-        return res.status(500).render('error', {
-          message: 'Payment configuration error',
-          error: 'No UPI intent configured for this merchant'
-        });
+        // Mobile browser but no UPI intent available - show error with debug info
+        console.log(`[ERROR] Mobile browser detected but no UPI intent available`);
+        console.log(`[DEBUG] AppType: ${appType}`);
+        console.log(`[DEBUG] Merchant: ${merchant.name}`);
+        console.log(`[DEBUG] Merchant UPI:`, JSON.stringify(merchant.upi, null, 2));
+        console.log(`[DEBUG] User-Agent: ${userAgent.substring(0, 100)}`);
+        console.log(`[DEBUG] Referer: ${referer || 'NONE'}`);
+        
+        // Try to use any available UPI intent as fallback
+        if (merchant.upi) {
+          if (merchant.upi.gpay_intent) {
+            upiIntent = merchant.upi.gpay_intent;
+            console.log(`[FALLBACK] Using GPay intent as fallback`);
+          } else if (merchant.upi.phonepe_intent) {
+            upiIntent = merchant.upi.phonepe_intent;
+            console.log(`[FALLBACK] Using PhonePe intent as fallback`);
+          } else if (merchant.upi.paytm_intent) {
+            upiIntent = merchant.upi.paytm_intent;
+            console.log(`[FALLBACK] Using Paytm intent as fallback`);
+          }
+        }
+        
+        if (!upiIntent) {
+          return res.status(500).render('error', {
+            message: 'Payment configuration error',
+            error: 'No UPI intent configured for this merchant'
+          });
+        }
       }
     }
     
