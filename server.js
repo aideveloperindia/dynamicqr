@@ -231,7 +231,7 @@ app.get('/p/:code', async (req, res) => {
     
     // 1. Google Lens → Google Review (must check BEFORE mobile browser)
     if (appType === AppType.GOOGLE_LENS && codeMerchants.length > 0) {
-      const merchant = await resolveMerchant(codeMerchants, coords, ip);
+      const merchant = resolveMerchant(codeMerchants);
       if (merchant.google_place_id) {
         const reviewUrl = `https://search.google.com/local/writereview?placeid=${merchant.google_place_id}`;
         console.log(`[REDIRECT] Google Lens -> Google Review: ${reviewUrl}`);
@@ -241,7 +241,7 @@ app.get('/p/:code', async (req, res) => {
     
     // 2. Camera → Landing page (shows menu, WiFi, etc.)
     if (appType === AppType.CAMERA && codeMerchants.length > 0) {
-      const merchant = await resolveMerchant(codeMerchants, coords, ip);
+      const merchant = resolveMerchant(codeMerchants);
       console.log(`[REDIRECT] Camera -> Landing page (menu, WiFi)`);
       return res.render('landing', {
         code,

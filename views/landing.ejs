@@ -246,14 +246,9 @@
         <h1>Welcome!</h1>
         <p class="subtitle">Finding the best merchant for you...</p>
         
-        <div class="loading" id="loading">
+        <div class="loading" id="loading" style="display: none;">
             <div class="spinner"></div>
-            <p>Requesting location access...</p>
-        </div>
-
-        <div class="location-denied" id="locationDenied" style="display: none;">
-            <p>📍 Location access denied. Using default merchant.</p>
-            <button class="btn" onclick="resolveMerchant()">Continue</button>
+            <p>Loading...</p>
         </div>
 
         <div class="merchant-info" id="merchantInfo">
@@ -499,17 +494,14 @@
                 document.getElementById('locationDenied').style.display = 'none';
                 document.getElementById('errorMessage').classList.remove('active');
 
-                const response = await fetch('/choose', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        code: code,
-                        lat: lat,
-                        lng: lng
-                    })
-                });
+                // Use first merchant directly - no API call needed
+                const merchants = <%- JSON.stringify(merchants || []) %>;
+                if (merchants.length === 0) {
+                    throw new Error('No merchants available');
+                }
+                
+                const merchant = merchants[0];
+                const response = { merchant: merchant };
 
                 const data = await response.json();
 
