@@ -44,6 +44,30 @@ function extractUPIId(intentUrl) {
   return 'unknown@upi';
 }
 
+// Menu route
+app.get('/menu', async (req, res) => {
+  try {
+    const code = req.query.code || 'SHARED1';
+    const merchantId = req.query.merchant;
+    
+    let merchant = null;
+    if (merchantId) {
+      const merchants = getMerchantsByCode(code);
+      merchant = merchants.find(m => m.id === merchantId);
+    }
+    
+    res.render('menu', { 
+      merchant: merchant || null
+    });
+  } catch (error) {
+    console.error('[ERROR] Menu route:', error);
+    res.status(500).render('error', {
+      message: 'Error loading menu',
+      error: error.message
+    });
+  }
+});
+
 // Home route
 app.get('/', (req, res) => {
   res.send(`
