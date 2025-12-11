@@ -101,6 +101,9 @@ app.get('/p/:code', async (req, res) => {
   const xRequestedWith = req.get('x-requested-with') || '';
   const ip = req.ip || req.connection.remoteAddress;
   
+  // Check for app type in query params (fallback for apps that don't send headers)
+  const appParam = req.query.app; // ?app=gpay, ?app=phonepe, etc.
+  
   // Get coordinates from query params (if available)
   const lat = parseFloat(req.query.lat);
   const lng = parseFloat(req.query.lng);
@@ -117,9 +120,29 @@ app.get('/p/:code', async (req, res) => {
     }
 
     // Detect which app opened the URL
-    const appType = detectApp(userAgent, xRequestedWith);
+    let appType = detectApp(userAgent, xRequestedWith);
     
-    console.log(`[DETECTION] Code: ${code}, App: ${appType}, Coords: ${coords ? `${coords.lat},${coords.lng}` : 'none'}`);
+    // Override with query param if provided (for apps that open in browser)
+    if (appParam) {
+      const appMap = {
+        'gpay': AppType.GOOGLE_PAY,
+        'phonepe': AppType.PHONEPE,
+        'paytm': AppType.PAYTM,
+        'lens': AppType.GOOGLE_LENS
+      };
+      if (appMap[appParam.toLowerCase()]) {
+        appType = appMap[appParam.toLowerCase()];
+        console.log(`[DETECTION] Overridden by query param: ${appParam} -> ${appType}`);
+      }
+    }
+    
+    // Enhanced logging for debugging
+    console.log(`[DETECTION] Code: ${code}, App: ${appType}`);
+    console.log(`[HEADERS] User-Agent: ${userAgent.substring(0, 100)}`);
+    console.log(`[HEADERS] X-Requested-With: ${xRequestedWith || 'none'}`);
+    console.log(`[HEADERS] Referer: ${req.get('referer') || 'none'}`);
+    console.log(`[QUERY] app param: ${appParam || 'none'}`);
+    console.log(`[COORDS] ${coords ? `${coords.lat},${coords.lng}` : 'none'}`);
 
     // Resolve merchant (nearest if multiple, or first if single)
     const merchant = await resolveMerchant(codeMerchants, coords, ip);
@@ -222,6 +245,18 @@ app.post('/choose', async (req, res) => {
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Debug endpoint to see all headers
+app.get('/debug', (req, res) => {
+  res.json({
+    headers: req.headers,
+    userAgent: req.get('user-agent'),
+    xRequestedWith: req.get('x-requested-with'),
+    referer: req.get('referer'),
+    detectedApp: detectApp(req.get('user-agent') || '', req.get('x-requested-with') || ''),
+    query: req.query
+  });
 });
 
 app.listen(PORT, () => {

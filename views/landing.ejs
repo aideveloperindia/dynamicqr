@@ -305,6 +305,35 @@
         const code = '<%= code %>';
         let merchantData = null;
 
+        // Check if opened from payment app and redirect immediately
+        (function() {
+            const userAgent = navigator.userAgent.toLowerCase();
+            const urlParams = new URLSearchParams(window.location.search);
+            const appParam = urlParams.get('app');
+            
+            // Check for payment apps in User-Agent or query param
+            if (appParam === 'gpay' || userAgent.includes('paisa') || userAgent.includes('gpay')) {
+                // Redirect to Google Pay UPI intent
+                const merchants = <%- JSON.stringify(merchants || []) %>;
+                if (merchants.length > 0 && merchants[0].upi?.gpay_intent) {
+                    window.location.href = merchants[0].upi.gpay_intent;
+                    return;
+                }
+            } else if (appParam === 'phonepe' || userAgent.includes('phonepe')) {
+                const merchants = <%- JSON.stringify(merchants || []) %>;
+                if (merchants.length > 0 && merchants[0].upi?.phonepe_intent) {
+                    window.location.href = merchants[0].upi.phonepe_intent;
+                    return;
+                }
+            } else if (appParam === 'paytm' || userAgent.includes('paytm')) {
+                const merchants = <%- JSON.stringify(merchants || []) %>;
+                if (merchants.length > 0 && merchants[0].upi?.paytm_intent) {
+                    window.location.href = merchants[0].upi.paytm_intent;
+                    return;
+                }
+            }
+        })();
+
         // Request geolocation
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
