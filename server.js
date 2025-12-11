@@ -146,8 +146,12 @@ app.get('/p/:code', async (req, res) => {
       }
     }
     
-    // Logging
-    console.log(`[DETECTION] Code: ${code}, App: ${appType}, UA: ${userAgent.substring(0, 50)}`);
+    // Enhanced logging for debugging
+    console.log(`[DETECTION] Code: ${code}, App: ${appType}`);
+    console.log(`[HEADERS] User-Agent: ${userAgent.substring(0, 150)}`);
+    console.log(`[HEADERS] X-Requested-With: ${xRequestedWith || 'none'}`);
+    console.log(`[HEADERS] Referer: ${referer || 'none'}`);
+    console.log(`[QUERY] app param: ${appParam || 'none'}`);
 
     // IF PAYMENT APP DETECTED - RETURN UPI INTENT DIRECTLY (no redirect, no HTML)
     if (appType === AppType.GOOGLE_PAY || appType === AppType.PHONEPE || appType === AppType.PAYTM) {
