@@ -252,6 +252,7 @@ app.get('/p/:code', async (req, res) => {
     
     // 3. Check if mobile browser (for payment apps)
     // CRITICAL: Payment apps open URLs in mobile browsers, so we MUST check this
+    // Note: isMobileBrowser will be checked again below, but we log it here for debugging
     const isMobileBrowser = /Mobile|Android|iPhone|iPad|webview|wv/i.test(userAgent);
     
     console.log(`[MOBILE CHECK] isMobileBrowser: ${isMobileBrowser}, userAgent: ${userAgent.substring(0, 150)}`);
@@ -309,8 +310,7 @@ app.get('/p/:code', async (req, res) => {
         }
       }
       
-      // ALWAYS return redirect page for mobile browsers
-      // Note: upiIntent might be set in the fallback error handler above
+      // Return redirect page if we have UPI intent
       if (upiIntent) {
         console.log(`[UPI INTENT] ${appType} -> ${upiIntent}`);
         // Escape UPI intent for HTML/JavaScript
