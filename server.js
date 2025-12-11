@@ -99,6 +99,7 @@ app.get('/p/:code', async (req, res) => {
   const { code } = req.params;
   const userAgent = req.get('user-agent') || '';
   const xRequestedWith = req.get('x-requested-with') || '';
+  const referer = req.get('referer') || '';
   const ip = req.ip || req.connection.remoteAddress;
   
   // Check for app type in query params (fallback for apps that don't send headers)
@@ -119,10 +120,20 @@ app.get('/p/:code', async (req, res) => {
       });
     }
 
-    // Detect which app opened the URL
+    // DETECT APP FIRST - BEFORE ANYTHING ELSE
     let appType = detectApp(userAgent, xRequestedWith);
     
-    // Override with query param if provided (for apps that open in browser)
+    // Enhanced detection: Check referer for payment app indicators
+    const refererLower = referer.toLowerCase();
+    if (refererLower.includes('phonepe') || refererLower.includes('phone-pe')) {
+      appType = AppType.PHONEPE;
+    } else if (refererLower.includes('gpay') || refererLower.includes('google pay') || refererLower.includes('paisa')) {
+      appType = AppType.GOOGLE_PAY;
+    } else if (refererLower.includes('paytm')) {
+      appType = AppType.PAYTM;
+    }
+    
+    // Override with query param if provided
     if (appParam) {
       const appMap = {
         'gpay': AppType.GOOGLE_PAY,
@@ -132,43 +143,45 @@ app.get('/p/:code', async (req, res) => {
       };
       if (appMap[appParam.toLowerCase()]) {
         appType = appMap[appParam.toLowerCase()];
-        console.log(`[DETECTION] Overridden by query param: ${appParam} -> ${appType}`);
       }
     }
     
-    // Enhanced logging for debugging
-    console.log(`[DETECTION] Code: ${code}, App: ${appType}`);
-    console.log(`[HEADERS] User-Agent: ${userAgent.substring(0, 100)}`);
-    console.log(`[HEADERS] X-Requested-With: ${xRequestedWith || 'none'}`);
-    console.log(`[HEADERS] Referer: ${req.get('referer') || 'none'}`);
-    console.log(`[QUERY] app param: ${appParam || 'none'}`);
-    console.log(`[COORDS] ${coords ? `${coords.lat},${coords.lng}` : 'none'}`);
+    // Logging
+    console.log(`[DETECTION] Code: ${code}, App: ${appType}, UA: ${userAgent.substring(0, 50)}`);
 
-    // Resolve merchant (nearest if multiple, or first if single)
-    const merchant = await resolveMerchant(codeMerchants, coords, ip);
+    // IF PAYMENT APP DETECTED - REDIRECT IMMEDIATELY (no merchant resolution needed, use first merchant)
+    if (appType === AppType.GOOGLE_PAY || appType === AppType.PHONEPE || appType === AppType.PAYTM) {
+      // Use first merchant for immediate redirect (fastest)
+      const merchant = codeMerchants[0];
+      
+      let redirectUrl = null;
+      if (appType === AppType.GOOGLE_PAY && merchant.upi?.gpay_intent) {
+        redirectUrl = merchant.upi.gpay_intent;
+      } else if (appType === AppType.PHONEPE && merchant.upi?.phonepe_intent) {
+        redirectUrl = merchant.upi.phonepe_intent;
+      } else if (appType === AppType.PAYTM && merchant.upi?.paytm_intent) {
+        redirectUrl = merchant.upi.paytm_intent;
+      }
+      
+      if (redirectUrl) {
+        console.log(`[IMMEDIATE REDIRECT] ${appType} -> ${redirectUrl}`);
+        // Immediate redirect - no HTML, no delay
+        res.writeHead(307, {
+          'Location': redirectUrl,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        });
+        return res.end();
+      }
+    }
     
+    // Resolve merchant (only for non-payment apps or if payment app redirect failed)
+    const merchant = await resolveMerchant(codeMerchants, coords, ip);
     console.log(`[RESOLUTION] Selected merchant: ${merchant.name} (${merchant.id})`);
 
-    // Route based on app type - Always use real payment apps (no simulator)
+    // Handle other app types
     switch (appType) {
-      case AppType.GOOGLE_PAY:
-        if (merchant.upi?.gpay_intent) {
-          return res.redirect(302, merchant.upi.gpay_intent);
-        }
-        break;
-      
-      case AppType.PHONEPE:
-        if (merchant.upi?.phonepe_intent) {
-          return res.redirect(302, merchant.upi.phonepe_intent);
-        }
-        break;
-      
-      case AppType.PAYTM:
-        if (merchant.upi?.paytm_intent) {
-          return res.redirect(302, merchant.upi.paytm_intent);
-        }
-        break;
-      
       case AppType.GOOGLE_LENS:
         if (merchant.google_place_id) {
           const reviewUrl = `https://search.google.com/local/writereview?placeid=${merchant.google_place_id}`;
@@ -179,7 +192,7 @@ app.get('/p/:code', async (req, res) => {
       case AppType.CAMERA:
       case AppType.BROWSER:
       default:
-        // Render landing page
+        // Only render landing page if NOT a payment app
         return res.render('landing', { 
           code,
           merchant: null, // Will be resolved via geolocation
