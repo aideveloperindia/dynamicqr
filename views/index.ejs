@@ -19,7 +19,6 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
             padding: 20px;
         }
 
@@ -30,7 +29,23 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: space-between;
+        }
+
+        .logo-section {
+            margin-bottom: 40px;
+        }
+
+        .adx-logo {
+            max-width: 200px;
+            height: auto;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 480px) {
+            .adx-logo {
+                max-width: 150px;
+            }
         }
 
         .icons-container {
@@ -115,8 +130,9 @@
         }
 
         .footer {
-            margin-top: 60px;
-            padding-top: 30px;
+            margin-top: auto;
+            padding-top: 40px;
+            padding-bottom: 20px;
             text-align: center;
             color: #ffffff;
             font-size: 14px;
@@ -174,6 +190,10 @@
 </head>
 <body>
     <div class="container">
+        <div class="logo-section">
+            <img src="/images/adxlogo.jpeg" alt="ADX Transit" class="adx-logo">
+        </div>
+        
         <div class="icons-container">
             <a href="/instagram" class="icon-link instagram" target="_blank">
                 <i class="fab fa-instagram"></i>
