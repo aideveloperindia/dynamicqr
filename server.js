@@ -4,7 +4,9 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// Serve static files
+// Serve static files - MUST be before routes
+app.use('/images', express.static(path.join(__dirname, 'public/images')));
+app.use('/qr', express.static(path.join(__dirname, 'public/qr')));
 app.use(express.static('public'));
 
 // Set view engine
