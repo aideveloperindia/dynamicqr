@@ -2,8 +2,8 @@ const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
 
-// Deployment URL - change this to your Vercel URL after deployment
-const BASE_URL = process.env.BASE_URL || 'https://oneqrcode.vercel.app';
+// Deployment URL - Production Vercel URL
+const BASE_URL = process.env.BASE_URL || 'https://dynamicqr1-seven.vercel.app';
 
 async function generateQR() {
   try {
