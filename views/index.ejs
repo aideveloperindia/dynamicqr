@@ -56,14 +56,32 @@
 
         .icons-container {
             display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            width: 100%;
+            margin: auto 0;
+            flex: 1;
+            padding: 20px 10px;
+        }
+
+        .icons-row {
+            display: flex;
             justify-content: center;
             align-items: center;
             gap: 35px;
             flex-wrap: wrap;
             width: 100%;
-            margin: auto 0;
-            flex: 1;
-            padding: 20px 10px;
+        }
+
+        .icons-row.top-row {
+            /* Top row: 3 icons */
+        }
+
+        .icons-row.bottom-row {
+            /* Bottom row: 2 icons - centered */
+            justify-content: center;
         }
 
         .icon-link {
@@ -146,8 +164,12 @@
             }
 
             .icons-container {
-                gap: 25px;
+                gap: 20px;
                 padding: 15px 5px;
+            }
+
+            .icons-row {
+                gap: 25px;
             }
 
             .icon-link {
