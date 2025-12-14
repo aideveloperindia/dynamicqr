@@ -5,29 +5,29 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Serve static files - MUST be before routes
-// For Vercel: Files in public/ folder are auto-served, but we also serve via Express as fallback
+// For Vercel: Files in public/ folder should be auto-served, but we handle them explicitly
 const publicPath = path.join(__dirname, 'public');
 
-// Serve static files with proper MIME types
-app.use('/images', express.static(path.join(publicPath, 'images'), {
-  maxAge: '1y',
-  immutable: true,
-  setHeaders: (res, filePath) => {
-    const ext = path.extname(filePath).toLowerCase();
-    if (ext === '.png') {
-      res.setHeader('Content-Type', 'image/png');
-    } else if (ext === '.jpeg' || ext === '.jpg') {
-      res.setHeader('Content-Type', 'image/jpeg');
-    }
+// CRITICAL: Serve static files BEFORE any other routes
+// This ensures they work in both local and Vercel environments
+app.use('/images', (req, res, next) => {
+  // Set proper content-type headers
+  const ext = path.extname(req.path).toLowerCase();
+  if (ext === '.png') {
+    res.setHeader('Content-Type', 'image/png');
+  } else if (ext === '.jpeg' || ext === '.jpg') {
+    res.setHeader('Content-Type', 'image/jpeg');
   }
-}));
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  next();
+}, express.static(path.join(publicPath, 'images')));
 
 app.use('/qr', express.static(path.join(publicPath, 'qr'), {
   maxAge: '1y',
   immutable: true
 }));
 
-// General static files
+// General static files fallback
 app.use(express.static(publicPath, {
   maxAge: '1y',
   immutable: true
