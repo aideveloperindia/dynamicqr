@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Deployment URL - Production Vercel URL
-const BASE_URL = process.env.BASE_URL || 'https://dynamicqr1-seven.vercel.app';
+const BASE_URL = process.env.BASE_URL || 'https://dynamicqr1.vercel.app';
 
 async function generateQR() {
   try {
