@@ -7,7 +7,18 @@ const PORT = process.env.PORT || 4000;
 // Serve static files - MUST be before routes
 // Handle static files explicitly for both local and Vercel
 const publicPath = path.join(__dirname, 'public');
-app.use('/images', express.static(path.join(publicPath, 'images')));
+
+// Serve images with proper headers
+app.use('/images', express.static(path.join(publicPath, 'images'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.png')) {
+      res.setHeader('Content-Type', 'image/png');
+    } else if (filePath.endsWith('.jpeg') || filePath.endsWith('.jpg')) {
+      res.setHeader('Content-Type', 'image/jpeg');
+    }
+  }
+}));
+
 app.use('/qr', express.static(path.join(publicPath, 'qr')));
 app.use(express.static(publicPath));
 
