@@ -5,17 +5,23 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Serve static files - MUST be before routes
-// For Vercel, static files in public/ are automatically served at root
-// But we also serve them via Express for local development
-app.use('/images', express.static(path.join(__dirname, 'public/images'), {
-  maxAge: '1y',
-  immutable: true
-}));
-app.use('/qr', express.static(path.join(__dirname, 'public/qr'), {
-  maxAge: '1y',
-  immutable: true
-}));
-app.use(express.static(path.join(__dirname, 'public')));
+// Handle static files explicitly for both local and Vercel
+const publicPath = path.join(__dirname, 'public');
+app.use('/images', express.static(path.join(publicPath, 'images')));
+app.use('/qr', express.static(path.join(publicPath, 'qr')));
+app.use(express.static(publicPath));
+
+// Debug route to check if files exist
+app.get('/debug/images', (req, res) => {
+  const fs = require('fs');
+  const imagesPath = path.join(__dirname, 'public/images');
+  try {
+    const files = fs.readdirSync(imagesPath);
+    res.json({ files, path: imagesPath });
+  } catch (error) {
+    res.json({ error: error.message, path: imagesPath });
+  }
+});
 
 // Set view engine
 app.set('view engine', 'ejs');
