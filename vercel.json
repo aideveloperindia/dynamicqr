@@ -9,11 +9,11 @@
   "routes": [
     {
       "src": "/images/(.*)",
-      "dest": "/images/$1"
+      "dest": "/public/images/$1"
     },
     {
       "src": "/qr/(.*)",
-      "dest": "/qr/$1"
+      "dest": "/public/qr/$1"
     },
     {
       "src": "/(.*)",
